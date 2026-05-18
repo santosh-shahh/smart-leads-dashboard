@@ -3,6 +3,7 @@ import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import api from '../api/client';
 import { User, Lock, Loader2, Mail } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -140,6 +141,36 @@ export default function Register() {
             >
               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Register'}
             </button>
+          </div>
+          
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Or continue with</span>
+            </div>
+          </div>
+
+          <div className="flex justify-center mt-4">
+            <GoogleLogin
+              onSuccess={async (credentialResponse) => {
+                setError('');
+                setIsLoading(true);
+                try {
+                  const { data } = await api.post('/auth/google', { token: credentialResponse.credential });
+                  login(data, data.token);
+                  navigate('/');
+                } catch (err: any) {
+                  setError(err.response?.data?.message || 'Google registration failed');
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              onError={() => {
+                setError('Google Registration Failed');
+              }}
+            />
           </div>
         </form>
         <div className="text-center mt-4">

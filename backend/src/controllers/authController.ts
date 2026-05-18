@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import User, { UserRole } from '../models/User';
 import generateToken from '../utils/generateToken';
 import { z } from 'zod';
+import { OAuth2Client } from 'google-auth-library';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -72,5 +75,51 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     }
   } catch (error) {
     next(error);
+  }
+};
+
+export const googleAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      res.status(400);
+      throw new Error('No Google token provided');
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      res.status(400);
+      throw new Error('Invalid Google token');
+    }
+
+    const { email, name, sub } = payload;
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create user if they don't exist
+      user = await User.create({
+        name: name || 'Google User',
+        email,
+        password: sub + process.env.JWT_SECRET!, // Secure placeholder password for OAuth users
+        role: UserRole.SALES,
+      });
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id.toString(), user.role),
+    });
+  } catch (error) {
+    res.status(401);
+    next(new Error('Google Authentication Failed'));
   }
 };
