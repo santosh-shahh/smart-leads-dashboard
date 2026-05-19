@@ -68,6 +68,12 @@ A full-stack Lead Management Dashboard built using the MERN stack with clean arc
 3. The frontend will be available at `http://localhost:80`
 4. The backend will be available at `http://localhost:5001`
 
+### Live Deployed Application
+- **Frontend (Vercel):** [https://frontend-pi-self-65.vercel.app](https://frontend-pi-self-65.vercel.app)
+- **Backend API (Render):** [https://smart-leads-api-pi75.onrender.com](https://smart-leads-api-pi75.onrender.com)
+- **Database:** MongoDB Atlas (Cloud Cluster)
+
+
 ### Running Locally without Docker
 
 **Backend:**
