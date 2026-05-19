@@ -123,3 +123,31 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
     next(new Error('Google Authentication Failed'));
   }
 };
+
+export const guestAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const email = 'guest@example.com';
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({
+        name: 'Guest User',
+        email,
+        password: process.env.JWT_SECRET! + 'guest_password',
+        role: UserRole.SALES,
+      });
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id.toString(), user.role),
+    });
+  } catch (error) {
+    console.error('Guest Auth Error:', error);
+    res.status(500);
+    next(new Error('Guest Authentication Failed'));
+  }
+};

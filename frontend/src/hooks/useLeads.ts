@@ -1,33 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import api from '../api/client';
-
-export interface Lead {
-  _id: string;
-  name: string;
-  email: string;
-  status: 'New' | 'Contacted' | 'Qualified' | 'Lost';
-  source: 'Website' | 'Instagram' | 'Referral';
-  createdAt: string;
-}
-
-interface FetchLeadsParams {
-  page: number;
-  limit: number;
-  search: string;
-  status: string;
-  source: string;
-  sort: string;
-}
-
-interface FetchLeadsResponse {
-  leads: Lead[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-}
+import type { Lead, FetchLeadsParams, FetchLeadsResponse, LeadStats } from '../types';
 
 export const useLeads = (params: FetchLeadsParams) => {
   return useQuery<FetchLeadsResponse>({
@@ -36,8 +9,8 @@ export const useLeads = (params: FetchLeadsParams) => {
       const { data } = await api.get('/leads', { params });
       return data;
     },
-    keepPreviousData: true,
-  } as any); // using any for keepPreviousData to bypass TS version conflict
+    placeholderData: keepPreviousData,
+  });
 };
 
 export const useLead = (id: string) => {
@@ -51,6 +24,16 @@ export const useLead = (id: string) => {
   });
 };
 
+export const useLeadStats = () => {
+  return useQuery<LeadStats>({
+    queryKey: ['leadStats'],
+    queryFn: async () => {
+      const { data } = await api.get('/leads/stats');
+      return data;
+    },
+  });
+};
+
 export const useCreateLead = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -60,6 +43,7 @@ export const useCreateLead = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leadStats'] });
     },
   });
 };
@@ -73,6 +57,7 @@ export const useUpdateLead = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leadStats'] });
     },
   });
 };
@@ -86,6 +71,7 @@ export const useDeleteLead = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leadStats'] });
     },
   });
 };

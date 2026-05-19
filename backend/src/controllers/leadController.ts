@@ -131,6 +131,41 @@ export const deleteLead = async (req: Request, res: Response, next: NextFunction
   }
 };
 
+// @desc    Get lead statistics
+// @route   GET /api/leads/stats
+// @access  Private
+export const getLeadStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const total = await Lead.countDocuments();
+
+    const statusCounts = await Lead.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+
+    const sourceCounts = await Lead.aggregate([
+      { $group: { _id: '$source', count: { $sum: 1 } } },
+    ]);
+
+    // Build status map with defaults
+    const byStatus: Record<string, number> = { New: 0, Contacted: 0, Qualified: 0, Lost: 0 };
+    statusCounts.forEach((s) => { byStatus[s._id] = s.count; });
+
+    const bySource: Record<string, number> = { Website: 0, Instagram: 0, Referral: 0 };
+    sourceCounts.forEach((s) => { bySource[s._id] = s.count; });
+
+    const conversionRate = total > 0 ? Math.round((byStatus.Qualified / total) * 100) : 0;
+
+    res.json({
+      total,
+      byStatus,
+      bySource,
+      conversionRate,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Export leads to CSV
 // @route   GET /api/leads/export
 // @access  Private/Admin
