@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { LayoutDashboard, LogOut, Sun, Moon, Menu, X, ChevronLeft, Zap } from 'lucide-react';
+import api from '../../api/client';
 import '../../App.css';
 
 export default function Layout() {
-  const { user, logout } = useAuthStore();
+  const { user, login, logout } = useAuthStore();
   const location = useLocation();
   const [isDark, setIsDark] = useState(
     localStorage.getItem('theme') === 'dark' ||
@@ -13,6 +14,7 @@ export default function Layout() {
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(!user);
 
   useEffect(() => {
     if (isDark) {
@@ -24,8 +26,43 @@ export default function Layout() {
     }
   }, [isDark]);
 
-  if (!user) {
+  const handleLogout = () => {
+    sessionStorage.setItem('loggedOut', 'true');
+    logout();
+  };
+
+  useEffect(() => {
+    const isLoggedOut = sessionStorage.getItem('loggedOut') === 'true';
+    if (!user && !isLoggedOut) {
+      // Silently auto-login as guest
+      const autoLogin = async () => {
+        try {
+          const { data } = await api.post('/auth/guest');
+          login(data, data.token);
+        } catch (err) {
+          console.error("Auto guest login failed:", err);
+          setIsAutoLoggingIn(false);
+        }
+      };
+      autoLogin();
+    } else {
+      setIsAutoLoggingIn(false);
+    }
+  }, [user, login]);
+
+  if (!user && sessionStorage.getItem('loggedOut') === 'true') {
     return <Navigate to="/login" replace />;
+  }
+
+  if (isAutoLoggingIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   const navItems = [
@@ -48,72 +85,61 @@ export default function Layout() {
           ${sidebarCollapsed ? 'lg:w-[72px]' : 'lg:w-60'}
           ${sidebarOpen ? 'translate-x-0 w-60' : '-translate-x-full lg:translate-x-0'}`}
       >
-        {/* Logo */}
-        <div className={`flex items-center h-16 border-b border-gray-100 dark:border-gray-700/50 px-4 ${sidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/30">
-            <Zap className="w-4 h-4 text-white" />
-          </div>
+        {/* Brand */}
+        <div className="h-16 flex items-center justify-between px-6 border-b border-gray-200/60 dark:border-gray-700/50">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-indigo-600 dark:bg-indigo-500 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-600/20">
+              <Zap className="w-5 h-5 fill-current" />
+            </div>
+            {!sidebarCollapsed && (
+              <span className="font-bold text-gray-950 dark:text-white tracking-tight">SmartLeads</span>
+            )}
+          </Link>
           {!sidebarCollapsed && (
-            <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600">
-              SmartLeads
-            </span>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg lg:hidden"
+            >
+              <X className="w-5 h-5" />
+            </button>
           )}
-
-          {/* Close button for mobile */}
-          <button
-            className="ml-auto p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
           {navItems.map((item) => {
+            const Icon = item.icon;
             const isActive = location.pathname === item.path;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'sidebar-active text-indigo-700 dark:text-indigo-300'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-200'
-                } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                title={sidebarCollapsed ? item.label : undefined}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group relative
+                  ${isActive
+                    ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/60 hover:text-gray-900 dark:hover:text-gray-200'
+                  }`}
               >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                {!sidebarCollapsed && item.label}
+                <Icon className={`w-5 h-5 transition-transform group-hover:scale-105 ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                {!sidebarCollapsed && <span>{item.label}</span>}
+                {sidebarCollapsed && (
+                  <div className="absolute left-full ml-2 px-2.5 py-1.5 bg-gray-950 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-md">
+                    {item.label}
+                  </div>
+                )}
               </Link>
             );
           })}
         </nav>
 
-        {/* Collapse toggle — desktop only */}
-        <div className="hidden lg:block p-3 border-t border-gray-100 dark:border-gray-700/50">
+        {/* Collapse Button (Desktop) */}
+        <div className="p-4 border-t border-gray-200/60 dark:border-gray-700/50 hidden lg:block">
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-full flex items-center justify-center p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
+            className="w-full flex items-center justify-center p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-all border border-gray-200/40 dark:border-gray-700/30"
           >
-            <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${sidebarCollapsed ? 'rotate-180' : ''}`} />
+            <ChevronLeft className={`w-5 h-5 transition-transform duration-300 ${sidebarCollapsed ? 'rotate-180' : ''}`} />
           </button>
-        </div>
-
-        {/* User area */}
-        <div className={`p-3 border-t border-gray-100 dark:border-gray-700/50 ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
-          <div className={`flex items-center gap-3 ${sidebarCollapsed ? '' : 'px-2'}`}>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-sm font-semibold shadow-sm flex-shrink-0">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            {!sidebarCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{user.name}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user.role}</p>
-              </div>
-            )}
-          </div>
         </div>
       </aside>
 
@@ -148,7 +174,7 @@ export default function Layout() {
               <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
 
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="p-2.5 text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
                 title="Sign out"
               >
